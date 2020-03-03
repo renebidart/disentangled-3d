@@ -9,7 +9,6 @@ from pathlib import Path
 import torch
 from torch import nn, optim
 import torch.nn.functional as F
-from torch.nn import functional as F
 from torch.utils.data import DataLoader
 import torchvision
 import torchvision.transforms as transforms
@@ -32,13 +31,14 @@ parser.add_argument('--data_path', type=str, default='./data/ModelNet10')
 parser.add_argument('--save_path', default="./results", type=str)
 
 parser.add_argument('--model_type', type=str, default='avae3d')
-parser.add_argument("--n_classes", type=int, default=10)
+parser.add_argument("--n_classes", type=int, default=1)
+parser.add_argument("--category", type=str, default='dresser')
 
 
 parser.add_argument('--data_augmentation', type=str, default='none')
+parser.add_argument('--val_augmentation', type=str, default='none')
 parser.add_argument('--opt_method', type=str, default='none')
 parser.add_argument('--latent_size', type=int, default=8)
-
 
 # parser.add_argument("--channel_factor", type=int)
 # parser.add_argument("--ws_factor", type=int, default=1)
@@ -46,6 +46,8 @@ parser.add_argument('--latent_size', type=int, default=8)
 # parser.add_argument("--ws_ch_factor", type=int, default=1)
 # parser.add_argument("--downsample_repeat", action='store_true')
 args = parser.parse_args()
+print(args)
+
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 assert args.data_augmentation in ['none', 'random_90_rot']
@@ -113,14 +115,17 @@ class TransformedModelNetVoxels(ModelNetVoxels):
 if args.dataset == 'modelnet10':
     categories = ['dresser', 'desk', 'night_stand',  'bathtub', 'chair', 
                    'sofa', 'monitor', 'table', 'toilet', 'bed']
-    categories = categories[:args.n_classes]
-    
+    if args.n_classes > 1:
+        categories = categories[:args.n_classes]
+    else:
+        categories = [args.category]
+    print(f'Using categories: {categories}')
     trainset = TransformedModelNetVoxels(args.data_path, transform_type=args.data_augmentation, categories=categories, 
                                          resolutions=[32], split='train', device=device)
-    valset = TransformedModelNetVoxels(args.data_path, transform_type=args.data_augmentation, categories=categories, 
+    valset = TransformedModelNetVoxels(args.data_path, transform_type=args.val_augmentation, categories=categories, 
                                        resolutions=[32], split='test', device=device)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.bs, num_workers=2)
-    val_loader = torch.utils.data.DataLoader(valset, batch_size=2*args.bs, num_workers=2)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.bs, num_workers=2, shuffle=True)
+    val_loader = torch.utils.data.DataLoader(valset, batch_size=2*args.bs, num_workers=2, shuffle=False)
         
 
 if args.model_type=='avae3d':

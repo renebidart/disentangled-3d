@@ -91,8 +91,14 @@ class AVAE3d(nn.Module):
             bs, ch, _, _, _ = x.size()
             n_affine, _, _ = affine_params.size()
             x_repeated = x.repeat(n_affine, 1, 1, 1, 1)
-            affine_params_repeat = affine_params.repeat_interleave(bs).view(bs*n_affine, 3, 4).to(x.device)
-                        
+#             print(affine_params.size())
+#             print(affine_params[0, :, :])
+#             affine_params_repeat = affine_params.repeat_interleave(bs).view(bs*n_affine, 3, 4).to(x.device)
+            affine_params_repeat = affine_params.repeat(bs, 1, 1).view(bs*n_affine, 3, 4).to(x.device)
+
+#             print('affine_params_repeat.size()', affine_params_repeat.size())
+#             print(affine_params_repeat[0, :, :])
+            
             recon_x, mu = self.affine_forward(x_repeated, affine_params=affine_params_repeat, deterministic=deterministic)
             
             loss = self.vae_loss_unreduced((recon_x, mu), x_repeated)
@@ -102,11 +108,19 @@ class AVAE3d(nn.Module):
             # select the params, recon_x, mu corresponding to lowest loss
             mu = mu.view(n_affine, bs, -1)
             affine_params_repeat = affine_params_repeat.view(n_affine, bs, 3, 4)
+#             print(affine_params_repeat.size())
+#             print(affine_params_repeat[0, 0, :, :])
+
             recon_x = recon_x.view(n_affine, bs, 1, recon_x.size(-3), recon_x.size(-2), recon_x.size(-1))
             
             recon_x_best = recon_x[best_param_idx.squeeze(), torch.arange(bs), :, :, :, :]
             mu_best = mu[best_param_idx.squeeze(), torch.arange(bs), :]
+#             print(best_param_idx)
+#             print(affine_params_repeat[0, :, :])
+
             best_affine_params = affine_params_repeat[best_param_idx.squeeze(), torch.arange(bs), :, :]
+#             print(affine_params_repeat[0, :, :])
+#             print(best_affine_params)
 
         return recon_x_best, mu_best, best_loss, best_affine_params
             

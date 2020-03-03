@@ -1,0 +1,11 @@
+# CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_1class_90aug_all90_l8 --model_type avae3d --n_classes 1 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 8 
+# CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_10class_90aug_all90_l8 --model_type avae3d --n_classes 10 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 8
+
+# CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_1class_90aug_all90_l4 --model_type avae3d --n_classes 1 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 4 
+# CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_10class_90aug_all90_l4 --model_type avae3d --n_classes 10 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 4
+
+# CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_1class_90aug_all90_l16 --model_type avae3d --n_classes 1 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 16 
+# CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_10class_90aug_all90_l16 --model_type avae3d --n_classes 10 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 16
+
+CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_1class_90aug_all90_l32 --model_type avae3d --n_classes 1 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 32 
+CUDA_VISIBLE_DEVICES=1 python train.py --lr 3e-3 --bs 32 --epochs 400  --save_path ./results/test2_90_aug_opt/avae_modelnet_10class_90aug_all90_l32 --model_type avae3d --n_classes 10 --data_augmentation random_90_rot --opt_method all_90_rot  --val_augmentation random_90_rot --latent_size 32
