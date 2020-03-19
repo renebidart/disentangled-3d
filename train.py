@@ -213,7 +213,7 @@ def val(epoch, best_loss, save_freq):
         best_loss = val_loss
     return best_loss
       
-best_loss = 1000000000  # best val accuracy
+best_loss = 1000000000  # best val loss
 
 for epoch in range(args.epochs):
     train(epoch)
