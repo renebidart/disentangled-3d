@@ -1,0 +1,3 @@
+CUDA_VISIBLE_DEVICES=1 python train.py --bs 1 --lr 1e-5 --epochs 200  --save_path ./results/test3_5e4/randrot_sofa_l16_opt1 --latent_size 16 --category sofa --data_augmentation rand_rot --val_augmentation rand_rot --opt_method opt1
+
+CUDA_VISIBLE_DEVICES=1 python train.py --bs 1 --lr 1e-5 --epochs 200  --save_path ./results/test3_5e4/randrot_dresser_l16_opt1 --latent_size 16 --category dresser --data_augmentation rand_rot --val_augmentation rand_rot --opt_method opt1

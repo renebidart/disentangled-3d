@@ -9,6 +9,22 @@ See how another paper implements it, like 5 runs, then use std + mean for graphs
 
 Try the 
 
+
+#### March 23
+* Have tested all affine transforms and their optimization 
+* Have tested (in a sketchy way) 90 degree optimization during training - may have to go back and redo this
+* Have to test if optimization during training works
+**Hypothesis**: Affine optimization during training (and inference) results in models with lower validation set MSE.
+**Test**: 
+1. Baseline - No-opt (rot & rot + trans) - get number of epochs to train model (plot train and val), add a few incase affine takes longer. Record MSE and VAE loss.
+2. Affine-opt (rot & rot + trans) - plot train and val to make sure converged, compare to the baseline. Evaluate that rotations / translations converged during training.
+3. Also do comparision of l21 and 16 - we are really adding parameters here
+
+
+Do tests in order: sofa, dresser, more_complex_one, all_classes
+
+
+
 #### February 26 - 29
 **Hypothesis**: Because data is oriented somewhat consistently, it is harder to make a model encode randomly oriented data. Easier to encode a subset of the distribution.
 * **Test**: MSE on rotation augmented data should be higher than non rotation augmented, given limited model capacity. Validation set will be augnemted the same way as training for both

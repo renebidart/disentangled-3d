@@ -12,19 +12,19 @@ def pad_3d(x, pad_factor=1.5):
     img = F.pad(x, pad_amt, 'constant', 0)
     return img
 
-def pad_for_transform(x, max_trans=.4, rot_factor=1.1):
-    """pad the input and adjust the scaling and translation so the object stays withing the boundary
-    Default is 40% translation, and scale object by this. 
-    Factor of 1.1 added because of rotations (worst case would need 1.4)
-    Assume scaling==1
-    weirdly in pytorch you use scale as 1/scale, and translation as relative amount of translation
-    """
-    assert transform['scale'] == 1.0
-    pad_factor = np.round(rot_factor * (1.0+max_trans), decimals=1)
-    x_pad = pad_3d(x, pad_factor=pad_factor)
-    # Final translation is adjusted to be in terms of final object which is increased by pad_factor
-    transform['trans'] =  np.array(transform['trans']) / pad_factor
-    return x_pad
+# def pad_for_transform(x, max_trans=.4, rot_factor=1.1):
+#     """pad the input and adjust the scaling and translation so the object stays withing the boundary
+#     Default is 40% translation, and scale object by this. 
+#     Factor of 1.1 added because of rotations (worst case would need 1.4)
+#     Assume scaling==1
+#     weirdly in pytorch you use scale as 1/scale, and translation as relative amount of translation
+#     """
+#     assert transform['scale'] == 1.0
+#     pad_factor = np.round(rot_factor * (1.0+max_trans), decimals=1)
+#     x_pad = pad_3d(x, pad_factor=pad_factor)
+#     # Final translation is adjusted to be in terms of final object which is increased by pad_factor
+#     transform['trans'] =  np.array(transform['trans']) / pad_factor
+#     return x_pad
 
 
 def affine_transform(x, affine_mat, padding_mode='zeros'):
