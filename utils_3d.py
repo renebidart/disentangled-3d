@@ -56,9 +56,9 @@ def make_affine(r, t, device):
                                                              [0,0,0,0],
                                                              [0,0,0,1]], dtype=torch.float32, device=device
                                                             ).view(1,3,4).repeat(n, 1, 1)
-    identity = torch.tensor([[1,0,0,0],
-                             [0,1,0,0],
-                             [0,0,1,0]], dtype=torch.float32, device=device).view(1,3,4).repeat(n, 1, 1)
+#     identity = torch.tensor([[1,0,0,0],
+#                              [0,1,0,0],
+#                              [0,0,1,0]], dtype=torch.float32, device=device).view(1,3,4).repeat(n, 1, 1)
     
     x_sin_mask = torch.tensor([[0,0,0,0],\
       [0,0,-1,0],

@@ -50,7 +50,7 @@ class AVAE3d(nn.Module):
             zeros = torch.FloatTensor(affine_params.size()).fill_(0)[:, :, 0].unsqueeze(-1).to(x.device)
             inv_affine_params = torch.cat([torch.transpose(affine_params[:, :, :3], 1, 2), zeros], dim=-1)
         else:
-            M_inv = torch.inverse(affine_params[:, :, :3])  
+            M_inv = torch.inverse(affine_params[:, :, :3])
             t_inv = torch.bmm(-M_inv, affine_params[:, :, 3].unsqueeze(-1))
             inv_affine_params = torch.cat([M_inv, t_inv], dim=-1)
         grid = F.affine_grid(inv_affine_params, x.size(), align_corners=False).to(x.device)
