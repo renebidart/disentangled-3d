@@ -37,7 +37,7 @@ def make_affine2d(r, t, device):
               torch.sin(r.view(-1, 1, 1).repeat(1,3,3)) * sin_mask)[:, :2, :3]
     
     if t is not None: 
-        affine_mat = affine_mat + tx + tyy
+        affine_mat = affine_mat + tx + ty
     return affine_mat
 
 
@@ -60,6 +60,8 @@ class TransformedMNIST(torchvision.datasets.MNIST):
             t_init = torch.ones([1, 2], dtype=torch.float32, device=x.device).uniform_(-.2, .2)
         else:
             t_init = None
+            
+        x = x.unsqueeze(0)
         affine_params = make_affine2d(r=r_init, t=t_init, device=x.device)
         x = self.affine(x, affine_params, padding_mode='zeros')
         return x, affine_params
@@ -72,15 +74,14 @@ class TransformedMNIST(torchvision.datasets.MNIST):
         data = {}
         attributes = {}
         x = self.data[index].float().unsqueeze(0)
+        y = int(self.targets[index])
         x = F.pad(x, (6, 6, 6, 6), 'constant', 0)
-#         print(x.min().item(), x.max().item(), x.mean().item())
-#         x = transforms.Normalize((0.1307,), (0.3081,))(x).unsqueeze(0)
         x = x/255.
-#         print(x.min().item(), x.max().item(), x.mean().item())
+
         if self.transform_type == 'rand_rot':
             x, attributes['affine_params'] = self.random_affine(x, trans=False)
         if self.transform_type == 'rand_rot_trans':
             x, attributes['affine_params'] = self.random_affine(x,trans=True)
         elif self.transform_type == 'none':
             attributes['affine_params'] = self.id_mat.clone()
-        return {'data': x.squeeze(), 'attributes': attributes}
+        return {'data': x.squeeze(), 'attributes': attributes, 'y': y}

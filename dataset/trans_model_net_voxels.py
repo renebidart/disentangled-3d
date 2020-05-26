@@ -47,8 +47,12 @@ class TransformedModelNetVoxels(ModelNetVoxels):
         x = self.affine(x, affine_params.unsqueeze(0), padding_mode='zeros')
         return x, affine_params
     
-    def random_affine(self, x, trans=False):
-        r_init = torch.ones([1, 3], dtype=torch.float32, device=x.device).uniform_(0, 2*math.pi)
+    def random_affine(self, x, trans=False, rand_rot_1d=False):
+        if rand_rot_1d:
+            r_init = torch.zeros([1, 3], dtype=torch.float32, device=x.device)
+            r_init[0, 0] = torch.ones([1, 1], dtype=torch.float32, device=x.device).uniform_(0, 2*math.pi)
+        else:
+            r_init = torch.ones([1, 3], dtype=torch.float32, device=x.device).uniform_(0, 2*math.pi)
         if trans:
             t_init = torch.ones([1, 3], dtype=torch.float32, device=x.device).uniform_(-.2, .2)
         else:
@@ -80,6 +84,9 @@ class TransformedModelNetVoxels(ModelNetVoxels):
         if self.transform_type == 'rand_rot_trans':
             data[str(res)], attributes['affine_params'] = self.random_affine(data[str(res)].unsqueeze(0).unsqueeze(0),
                                                                              trans=True)
+        if self.transform_type == 'rand_rot_1d':
+            data[str(res)], attributes['affine_params'] = self.random_affine(data[str(res)].unsqueeze(0).unsqueeze(0),
+                                                                             trans=False, rand_rot_1d=True)        
         elif self.transform_type == 'none':
             attributes['affine_params'] = self.id_mat.clone()
             data[str(res)] = pad_3d(data[str(res)].squeeze(), pad_factor=1.5)

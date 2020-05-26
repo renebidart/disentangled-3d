@@ -7,38 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import TensorDataset, random_split, DataLoader
 from torch.nn import functional as F
 
-def make_affine2d(r, t, device):
-    """Differentiable batch version, so will only optimize rotation and translation,
-    If translation==None, treats it as fixed identity translation
-    """
-    n, _ = r.size()
-    r = r.to(device)
-    if t is None: # ignore translation entirely, don't create params
-        pass
-    else:
-        t = t.to(device)
-        tx = t[:, 0].view(-1,1,1).repeat(1,2,3)*torch.tensor([[0,0,1],
-                                                             [0,0,0]], dtype=torch.float32, device=device
-                                                            ).view(1,2,3).repeat(n, 1, 1)
-        ty = t[:, 1].view(-1,1,1).repeat(1,2,3)*torch.tensor([[0,0,0],
-                                                             [0,0,1]], dtype=torch.float32, device=device
-                                                              ).view(1,2,3).repeat(n, 1, 1)
-    sin_mask = torch.tensor([
-      [0,-1,0],
-      [1,0,0],
-      [0,0,0]], dtype=torch.float32, device = device).view(1,3,3).repeat(n, 1, 1)
-    cos_mask = torch.tensor([
-      [1,0,0],
-      [0,1,0],
-      [0,0,0]], dtype=torch.float32, device = device).view(1,3,3).repeat(n, 1, 1)
-
-    rot_mat = (torch.cos(r.view(-1, 1, 1).repeat(1,3,3)) * cos_mask + 
-              torch.sin(r.view(-1, 1, 1).repeat(1,3,3)) * sin_mask)[:, :2, :3]
-    if t is None: 
-        affine_mat = rot_mat
-    else:  
-        affine_mat = rot_mat + tx + ty
-    return affine_mat
+from utils_2d import make_affine2d
 
 
 class AVAE2d(nn.Module):
@@ -76,13 +45,15 @@ class AVAE2d(nn.Module):
             affine_params = affine_params.unsqueeze(0).repeat(x.size(0), 1, 1)
             mu = self.VAE.encode(x)
             z = self.VAE.reparameterize(mu, deterministic)
-            recon_x = self.VAE.decode(z)
+            recon_x = self.VAE.decode(z)            
+            loss = self.vae_loss_unreduced((recon_x, mu), x)
         elif 'rand_sgd' in self.opt_method:
             recon_x, mu, loss, affine_params = self.forward_opt(x, n_sgd=8, n_total_affine=32, deterministic=True)        
             recon_x, mu = self.affine_forward(x, affine_params=affine_params, deterministic=deterministic)
         return {'recon_x':recon_x, 
                 'mu': mu,
-                'affine_params': affine_params}
+                'affine_params': affine_params,
+                'loss': loss}
         
     def affine_forward(self, x, affine_params=None, deterministic=False):
         x_affine = self.affine(x, affine_params)
@@ -94,15 +65,15 @@ class AVAE2d(nn.Module):
 
     
     def forward_opt(self, x, n_sgd, n_total_affine, deterministic=True):
-        bs, ch, _, _, _ = x.size()
+        bs, ch, _, _ = x.size()
         r_init = torch.ones([n_total_affine*bs, 1], dtype=torch.float32, device=x.device).uniform_(0, 2*math.pi)
         if 'trans' in self.opt_method:
             t_init = torch.ones([n_total_affine*bs, 2], dtype=torch.float32, device=x.device).uniform_(-.2, .2)
         else:
             t_init = None
         with torch.no_grad():
-            affine_params = make_affine(r=r_init, t=t_init, device=x.device)
-            x_rep = x.repeat(n_total_affine, 1, 1, 1, 1)
+            affine_params = make_affine2d(r=r_init, t=t_init, device=x.device)
+            x_rep = x.repeat(n_total_affine, 1, 1, 1)
             recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
             loss = self.vae_loss_unreduced((recon_x, mu), x_rep)
             loss = loss.view(n_total_affine, bs, 1)
@@ -118,31 +89,44 @@ class AVAE2d(nn.Module):
             t_init = None
             optimizer = optim.Adam([r_init], lr=.03)
 
-        x_rep = x.repeat(n_sgd, 1, 1, 1, 1)
+        x_rep = x.repeat(n_sgd, 1, 1, 1)
 
         for i in range(15):
-            affine_params = make_affine(r=r_init, t=t_init, device=x.device)
+            affine_params = make_affine2d(r=r_init, t=t_init, device=x.device)
             recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
             loss = self.vae_loss_unreduced((recon_x, mu), x_rep).sum()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        affine_params = make_affine(r=r_init, t=t_init, device=x.device)
+        affine_params = make_affine2d(r=r_init, t=t_init, device=x.device)
         recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
         loss = self.vae_loss_unreduced((recon_x, mu), x_rep)
         best_loss, best_idx = torch.min(loss.view(n_sgd, bs), dim=0)
         
-        recon_x = recon_x.view(n_sgd, bs, 42, 42, 42)[best_idx, :, :, :]
+        recon_x = recon_x.view(n_sgd, bs, 40, 40)[best_idx, :, :, :]
         mu = mu.view(n_sgd, bs, -1)[best_idx, :]
         affine_params = affine_params.view(n_sgd, bs, 2, 3)[best_idx, torch.arange(bs), :, :].squeeze()
         return recon_x, mu, best_loss, affine_params    
 
-    def vae_loss_unreduced(self, output, x, KLD_weight=1):
-        recon_x, mu  = output
-        BCE = F.binary_cross_entropy(recon_x.squeeze(), x.squeeze(), reduction='none')
-        BCE = torch.sum(BCE, dim=(1, 2, 3))
-        KLD = -0.5 * torch.sum(1 + 0 - mu.pow(2) - 1)
-        return BCE + KLD_weight*KLD
+#     def vae_loss_unreduced(self, output, x, KLD_weight=1):
+#         recon_x, mu  = output
+#         BCE = F.binary_cross_entropy(recon_x.squeeze(), x.squeeze(), reduction='none')
+#         BCE = torch.sum(BCE, dim=(1, 2))
+#         KLD = -0.5 * torch.sum(1 + 0 - mu.pow(2) - 1)
+#         return BCE + KLD_weight*KLD
+
+    def vae_loss_unreduced(self, output, x):
+        """loss is BCE + KLD. target is original x"""
+        recon_x, mu_logvar = output
+        mu = mu_logvar[:, 0:int(mu_logvar.size()[1]/2)]
+        logvar = mu_logvar[:, int(mu_logvar.size()[1]/2):]
+#         KLD = -0.5 * torch.sum(1 + 2 * logvar - mu.pow(2) - (2 * logvar).exp())
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        MSE = F.mse_loss(recon_x.squeeze(), x.squeeze(), reduction='none')
+        MSE = torch.sum(MSE, dim=(1, 2))
+#         BCE = F.binary_cross_entropy(recon_x.squeeze(), x.squeeze(), reduction='none')
+#         BCE = torch.sum(BCE, dim=(1, 2))
+        return KLD + MSE
 
 
 class VAE2d(nn.Module):

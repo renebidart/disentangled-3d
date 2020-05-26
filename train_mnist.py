@@ -67,7 +67,9 @@ def vae_loss(recon_x, x, mu_logvar):
     """loss is BCE + KLD. target is original x"""
     mu = mu_logvar[:, 0:int(mu_logvar.size()[1]/2)]
     logvar = mu_logvar[:, int(mu_logvar.size()[1]/2):]
-    KLD = -0.5 * torch.sum(1 + 2 * logvar - mu.pow(2) - (2 * logvar).exp())
+#     KLD = -0.5 * torch.sum(1 + 2 * logvar - mu.pow(2) - (2 * logvar).exp())
+    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+#     BCE = F.binary_cross_entropy(recon_x.squeeze(), x.squeeze(), reduction='sum')
     MSE = F.mse_loss(recon_x.squeeze(), x.squeeze(), reduction='sum')
     return {'loss': KLD + MSE,
             'mse': MSE}
@@ -78,7 +80,7 @@ def train(epoch):
     for batch_idx, batch in enumerate(train_loader):
         x = batch['data'].to(device).unsqueeze(1)
         optimizer.zero_grad()
-        output = model(x, deterministic=False)
+        output = model(x, deterministic=True)
         losses = vae_loss(output['recon_x'], x, output['mu'])
         losses['loss'].backward()
         train_loss += losses['loss'].item()
@@ -93,15 +95,16 @@ def val(epoch, train_loss, results, save_freq):
     val_mse = 0
     model_ap_list = []
     data_ap_list = []
-#     with torch.no_grad(): Normally use no_grad for eval, but here we need gradients
+    y_list = []
     for batch_idx, batch in enumerate(val_loader):
-            x = batch['data'].to(device).unsqueeze(1)
-            output = model(x, deterministic=False)
-            losses = vae_loss(output['recon_x'], x, output['mu'])
-            val_loss += losses['loss'].item()
-            val_mse += losses['mse'].item()
-            data_ap_list.append(batch['attributes']['affine_params'])
-            model_ap_list.append(output['affine_params'])
+        x = batch['data'].to(device).unsqueeze(1)
+        output = model(x, deterministic=True)
+        losses = vae_loss(output['recon_x'], x, output['mu'])
+        val_loss += losses['loss'].item()
+        val_mse += losses['mse'].item()
+        data_ap_list.append(batch['attributes']['affine_params'])
+        model_ap_list.append(output['affine_params'])
+        y_list.append(batch['y'])
 
     val_loss /= len(val_loader.dataset)
     results['val_loss'].append(val_loss)
@@ -118,6 +121,7 @@ def val(epoch, train_loss, results, save_freq):
             'val_loss': val_loss,
             'val_mse': val_mse,
             'epoch': epoch,
+            'label_list': torch.cat(y_list, dim=0).detach().cpu().numpy(),
             'data_ap_list': torch.cat(data_ap_list, dim=0).detach().cpu().numpy() ,
             'model_ap_list': torch.cat(model_ap_list, dim=0).detach().cpu().numpy(),
             'results': results
@@ -140,5 +144,5 @@ results['train_loss'] = []
 results['best_loss'] = 1000000000  # best val loss
 for epoch in range(args.epochs):
     train_loss = train(epoch)
-    results = val(epoch, train_loss, results, save_freq=int(args.epochs/20))
+    results = val(epoch, train_loss, results, save_freq=1)
     scheduler.step()

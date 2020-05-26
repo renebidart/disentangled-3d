@@ -13,7 +13,7 @@ from utils_3d import make_affine
 class AVAE3d(nn.Module):
     def __init__(self, VAE, opt_method='all_90_rot'):
         super(AVAE3d, self).__init__()
-        assert opt_method in ['none', 'all_90_rot', 'rand_sgd_rot', 'rand_sgd_rot_trans', 'opt1']
+        assert opt_method in ['none', 'all_90_rot', 'rand_sgd_rot', 'rand_sgd_rot_trans', 'opt1', 'rand_sgd_1d']
         self.VAE = VAE
         self.opt_method = opt_method
         if self.opt_method == 'all_90_rot':
@@ -67,8 +67,12 @@ class AVAE3d(nn.Module):
             recon_x, mu, loss, affine_params = self.forward_best_90_rot(x, deterministic=True)
         elif 'rand_sgd' in self.opt_method:
             recon_x, mu, loss, affine_params = self.forward_opt(x, n_sgd=8, n_total_affine=32, deterministic=True)
+        elif 'rand_sgd_1d' in self.opt_method:
+            recon_x, mu, loss, affine_params = self.forward_opt1d(x, n_sgd=8, n_total_affine=32, deterministic=True)
         elif 'opt1' in self.opt_method:
-            recon_x, mu, loss, affine_params = self.forward_opt1(x, n_sgd=8, n_total_affine=32, deterministic=True)            
+            recon_x, mu, loss, affine_params = self.forward_opt1(x, n_sgd=8, n_total_affine=32, deterministic=True)
+        else:
+            print('Incorrect optimization method')
         # Shouldn't need this:
         recon_x, mu = self.affine_forward(x, affine_params=affine_params, deterministic=deterministic)
         return {'recon_x':recon_x, 
@@ -142,7 +146,7 @@ class AVAE3d(nn.Module):
 
         x_rep = x.repeat(n_sgd, 1, 1, 1, 1)
 
-        for i in range(20):
+        for i in range(15):
             affine_params = make_affine(r=r_init, t=t_init, device=x.device)
             recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
             loss = self.vae_loss_unreduced((recon_x, mu), x_rep).sum()
@@ -159,53 +163,47 @@ class AVAE3d(nn.Module):
         affine_params = affine_params.view(n_sgd, bs, 3, 4)[best_idx, torch.arange(bs), :, :].squeeze()
         return recon_x, mu, best_loss, affine_params    
 
-    
-#     def forward_opt(self, x, n_sgd, n_total_affine, deterministic=True):
-#         bs, ch, _, _, _ = x.size()
-#         r_init = torch.ones([n_total_affine, 3], dtype=torch.float32, device=x.device).uniform_(0, 2*math.pi)
-#         if 'trans' in self.opt_method:
-#             t_init = torch.ones([n_total_affine, 3], dtype=torch.float32, device=x.device).uniform_(-.2, .2)
-#         else:
-#             t_init = None
-#         with torch.no_grad():
-#             affine_params = make_affine(r=r_init, t=t_init, device=x.device).repeat(bs, 1, 1)
-#             x_rep = x.repeat(n_total_affine, 1, 1, 1, 1)
-#             recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
-#             loss = self.vae_loss_unreduced((recon_x, mu), x_rep)
-#             loss = loss.view(n_total_affine, bs, 1)            
-#             best_loss, best_param_idx = torch.topk(loss, k=n_sgd, dim=0, largest=False)
-            
-#         # SGD TIME - Select best params and get rid of old params so no grad or memory issues
-#         del recon_x, mu, x_rep
-#         r_init = r_init[best_param_idx, :].view(n_sgd*bs, 3).clone().detach().requires_grad_(True)
-#         if 'trans' in self.opt_method:
-#             t_init = t_init[best_param_idx, :].view(n_sgd*bs, 3).clone().detach().requires_grad_(True)
-#             optimizer = optim.Adam([r_init, t_init], lr=.03)
-#         else:
-#             t_init = None
-#             optimizer = optim.Adam([r_init], lr=.03)
 
-#         x_rep = x.repeat(n_sgd, 1, 1, 1, 1)
-
-#         for i in range(15):
-#             affine_params = make_affine(r=r_init, t=t_init, device=x.device)
-#             recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
-#             loss = self.vae_loss_unreduced((recon_x, mu), x_rep).sum()
-#             optimizer.zero_grad()
-#             loss.backward()
-#             optimizer.step()
-#         affine_params = make_affine(r=r_init, t=t_init, device=x.device)
-#         recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
-#         loss = self.vae_loss_unreduced((recon_x, mu), x_rep)
-#         best_loss, best_idx = torch.min(loss.view(n_sgd, bs), dim=0)
+    def forward_opt1d(self, x, n_sgd, n_total_affine, deterministic=True):
+        bs, ch, _, _, _ = x.size()
+        t_init = None
+        r_init = torch.zeros([n_total_affine*bs, 3], dtype=torch.float32, device=x.device)
+        r_init[:, 0] = torch.ones([n_total_affine*bs, 1], dtype=torch.float32, device=x.device).uniform_(0, 2*math.pi)
         
-# #         print(recon_x.size(), mu.size(), affine_params.size())
-#         recon_x = recon_x.view(n_sgd, bs, 48, 48, 48)[best_idx, :, :, :]
-#         mu = mu.view(n_sgd, bs, -1)[best_idx, :]
-#         affine_params = affine_params.view(n_sgd, bs, 3, 4)[best_idx, torch.arange(bs), :, :].squeeze()
-#         return recon_x, mu, best_loss, affine_params
-    
+        with torch.no_grad():
+            affine_params = make_affine(r=r_init, t=t_init, device=x.device)
+            x_rep = x.repeat(n_total_affine, 1, 1, 1, 1)
+            recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
+            loss = self.vae_loss_unreduced((recon_x, mu), x_rep)
+            loss = loss.view(n_total_affine, bs, 1)
+            best_loss, best_param_idx = torch.topk(loss, k=n_sgd, dim=0, largest=False)
+            
+        # SGD TIME - Select best params and get rid of old params so no grad or memory issues
+        del recon_x, mu, x_rep
+        r_init_1d = r_init[best_param_idx, 0].view(n_sgd*bs, 3).clone().detach().requires_grad_(True)
+        params_zeros = torch.zeros([n_total_affine*bs, 2], dtype=torch.float32, device=x.device).requires_grad_(False)
+        r_init = torch.cat([r_init_1d.unsqueeze(1), params_zeros], dim=1)        
+        optimizer = optim.Adam([r_init], lr=.01)
+        x_rep = x.repeat(n_sgd, 1, 1, 1, 1)
 
+        for i in range(6):
+            affine_params = make_affine(r=r_init, t=t_init, device=x.device)
+            recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
+            loss = self.vae_loss_unreduced((recon_x, mu), x_rep).sum()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        affine_params = make_affine(r=r_init, t=t_init, device=x.device)
+        recon_x, mu = self.affine_forward(x_rep, affine_params=affine_params, deterministic=deterministic)
+        loss = self.vae_loss_unreduced((recon_x, mu), x_rep)
+        best_loss, best_idx = torch.min(loss.view(n_sgd, bs), dim=0)
+        
+        recon_x = recon_x.view(n_sgd, bs, 48, 48, 48)[best_idx, :, :, :]
+        mu = mu.view(n_sgd, bs, -1)[best_idx, :]
+        affine_params = affine_params.view(n_sgd, bs, 3, 4)[best_idx, torch.arange(bs), :, :].squeeze()
+        return recon_x, mu, best_loss, affine_params    
+    
+    
     def forward_opt1(self, x, n_sgd, n_total_affine, deterministic=True):
         """ BS=1 !
         n_affine is number of random restarts
